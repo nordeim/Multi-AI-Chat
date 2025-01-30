@@ -1420,17 +1420,6 @@ class ModernChatWindow(QMainWindow):
         dialog = APIConfigDialog(self.config_manager, self)
         dialog.exec()
 
-class FileProcessor(QThread):
-    finished = pyqtSignal(str)
-
-    def __init__(self, file_path):
-        super().__init__()
-        self.file_path = file_path
-
-    def run(self):
-        result = self.processor.process_file(self.file_path) # Call method via processor instance
-        self.finished.emit(result)
-
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = ModernChatWindow()
