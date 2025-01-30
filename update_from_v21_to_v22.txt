@@ -1,0 +1,10 @@
+$ diff mychat-pyqt6-v22.py mychat-pyqt6-v21.py
+756,761c756
+<         try: # Issue #3 fix - Add try-except for initial session loading
+<             self._load_initial_session() # Issue #3 fix - Wrap in try-except
+<         except Exception as e: # Issue #3 fix - Catch session loading errors
+<             logging.error(f"Error loading initial session: {e}") # Issue #3 fix - Log error
+<             QMessageBox.warning(self, "Session Error", "Failed to load last session. Starting new session.") # Issue #3 fix - Inform user
+<             self._create_new_chat() # Issue #3 fix - Create a new session if loading fails
+---
+>         self._load_initial_session()
