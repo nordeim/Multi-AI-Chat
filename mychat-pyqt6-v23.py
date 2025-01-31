@@ -1427,6 +1427,12 @@ class ModernChatWindow(QMainWindow):
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"Export failed: {str(e)}")
 
+    # Add this method to ModernChatWindow class in mychat-pyqt6-v23.py
+
+    def show_error(self, message):
+        """Displays an error message in a QMessageBox"""
+        QMessageBox.critical(self, "Error", message)
+        
     def _show_emoji_picker(self):
         """Modern emoji picker implementation"""
         dialog = QDialog(self)
