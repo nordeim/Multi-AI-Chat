@@ -1,0 +1,23 @@
+$ diff mychat-pyqt6-v23.py mychat-pyqt6-v22.py
+797c797
+<
+---
+>
+805c805
+<
+---
+>
+812c812
+<                 quantization_config=None, # Disable quantization when using CPU mode
+---
+>                 quantization_config=None,  # Disable quantization when using CPU mode
+815d814
+<             self.image_processor = AutoProcessor.from_pretrained("llava-hf/llava-1.5-7b-hf") # ADD THIS LINE - Initialize image_processor
+817c816
+<
+---
+>
+820c819
+<
+---
+>
