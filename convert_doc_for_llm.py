@@ -73,7 +73,7 @@ def convert_epub_to_text(file_path):
     try:
         book = epub.read_epub(file_path)
         for item in book.get_items():
-            if item.get_type() == epub.ITEM_DOCUMENT:
+            if item.get_type() == 9: # Changed from epub.ITEM_DOCUMENT to 9
                 soup = BeautifulSoup(item.get_content(), 'html.parser')
                 text.append(soup.get_text())
         return "\n\n".join(text)
