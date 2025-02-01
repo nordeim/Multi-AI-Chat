@@ -7,6 +7,10 @@ $ pip install pymupdf python-docx pandas pillow transformers torch pyqt6 google.
 
 $ python mychat-pyqt6-v24.py # latest - fixed various file type handling issues in v6, v24 added full-screen toggle mode
 
+separate app to convert any document type to text represenation for use as LLM prompt:
+https://www.perplexity.ai/search/how-can-i-make-non-text-docume-3NyaJtsaRSyQgZXiH5YEQw
+app: https://github.com/nordeim/Multi-AI-Chat/blob/main/convert_document_for_LLM.py
+
 ![image](https://github.com/user-attachments/assets/ed5a514b-7925-4add-bbde-c9a5fe53ebed)
 
 ![image](https://github.com/user-attachments/assets/a56a128d-1c7d-4637-80ed-ea9aac45421c)
