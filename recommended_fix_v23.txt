@@ -1,0 +1,163 @@
+Okay, let's get this thread safety issue sorted out with a mutex! 👍 You're right, a quick and relatively safe fix is definitely preferable if we can achieve it. Let's go with the `QMutex` approach.
+
+*Here's the plan for the fix:*
+
+1.  *Initialize `QMutex` in `ChatSessionManager`*: We'll add a `QMutex` to the `ChatSessionManager` class to act as our lock.
+2.  *Pass the Mutex to `FileProcessingThread`*: When we create a `FileProcessingThread` in `ModernChatWindow`, we'll pass this mutex to it.
+3.  *Use the Mutex in `FileProcessingThread`*:  Inside `FileProcessingThread`, we'll acquire (lock) the mutex *before* accessing or modifying any shared session data (specifically, `self.session_manager.sessions`) and release (unlock) it *after* we're done.
+4.  *Refine `update_session_safe()`*:  The `update_session_safe()` method in `FileProcessingThread` looks like a good place to encapsulate the mutex usage. We'll make sure it's correctly implemented and called where needed.
+
+*Let's create the replacement code blocks.*
+
+```python
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QDir, QSize, QSettings, QTimer, QObject, QMutex # ADD QMutex
+from PyQt6.QtGui import (
+    QFont, QKeySequence, QTextCursor, QColor, QAction, QIcon,
+    QTextCharFormat, QPalette, QGuiApplication, QPixmap # Added QPixmap
+)
+# ... other imports ...
+
+class ChatSessionManager:
+    """Manages chat sessions with file persistence"""
+    def __init__(self):
+        self.executor = ThreadPoolExecutor(max_workers=1)
+        self.current_session_id = None
+        self.main_window = None
+        self.sessions = {}
+        self.session_mutex = QMutex() # <--- INITIALIZE MUTEX HERE!
+        self.load_sessions()
+
+    # ... rest of ChatSessionManager class ...
+
+class FileProcessingThread(QThread):
+    finished = pyqtSignal(str, str) # signal for text and file_path for preview
+    error = pyqtSignal(str)
+    session_updated = pyqtSignal() # Signal if session is updated - currently not used, but good practice
+
+    def __init__(self, processor, file_path, session_mutex): # <--- ADD session_mutex PARAMETER
+        super().__init__()
+        self.processor = processor
+        self.file_path = file_path
+        self.file_content_text = None
+        self.session_mutex = session_mutex # <--- STORE MUTEX
+        self.current_session = None # Placeholders - remove if not needed in thread context
+        self.session_id = None      # Placeholders - remove if not needed in thread context
+
+    def run(self):
+        try:
+            if self.file_path.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.gif', '.tiff')): # Added more image types
+                self.file_content_text = self.processor.process_image(self.file_path)
+                self.finished.emit(self.file_content_text, self.file_path) # emit text and file path for image preview
+            elif self.file_path.lower().endswith('.pdf'):
+                self.file_content_text = self.processor.process_pdf(self.file_path)
+                self.finished.emit(self.file_content_text, self.file_path) # emit text and file path (no preview for pdf)
+            elif self.file_path.lower().endswith(('.docx', '.doc', '.xlsx', '.xls', '.csv')): # ADDED .csv here
+                self.file_content_text = self.processor.process_office(self.file_path) # NOW CALLING process_office
+                self.finished.emit(self.file_content_text, self.file_path) # emit text and file path (no preview for office)
+            else:
+                raise ValueError("Unsupported file type")
+        except Exception as e:
+            logging.error(f"File processing error: {e}")
+            self.error.emit(str(e)) # Just emit the error string
+
+    # Add thread-safe session updates
+    def update_session_safe(self, data): # <--- MUTEX USED HERE!
+        self.session_mutex.lock() # <--- ACQUIRE LOCK
+        try:
+            if self.current_session:
+                self.current_session.update(data)
+        finally:
+            self.session_updated.emit()
+            self.session_mutex.unlock() # <--- RELEASE LOCK
+
+        # NOTE: Currently `update_session_safe` is NOT being called in the original `FileProcessingThread.run()`
+        #       We need to determine WHERE session data needs to be updated within this thread, if at all.
+        #       Based on the current code, it primarily focuses on *processing* the file and emitting results.
+        #       Session updates are handled in the main thread (e.g., attach_file_to_session in ChatSessionManager).
+        #       Therefore, for THIS SPECIFIC code, explicit session data MUTEXING within `FileProcessingThread.run()` might be *not needed*.
+        #       However, KEEPING `update_session_safe` with mutex as a utility function is still good practice
+        #       if you foresee future scenarios where session data *might* be updated from this thread.
+
+class ModernChatWindow(QMainWindow):
+    # ... rest of ModernChatWindow class ...
+
+    def _process_file_content(self, file_path):
+        """Process file content in a separate thread"""
+        self.status_bar.showMessage("Processing file...", 0) # Status message
+        self.progress_bar.setValue(0) # Reset progress bar
+        QApplication.processEvents() # Update UI
+
+        self.file_processor_thread = FileProcessingThread( # <--- PASS MUTEX HERE
+            self,
+            file_path,
+            self.session_manager.session_mutex # <--- PASS session_mutex from ChatSessionManager
+        )
+        self.file_processor_thread.finished.connect(self._handle_processed_content)
+        self.file_processor_thread.error.connect(self._handle_processing_error)
+        self.file_processor_thread.start()
+
+    # ... rest of ModernChatWindow class ...
+```
+
+*Explanation of Changes:*
+
+*   *`ChatSessionManager.__init__`*:
+    ```python
+    self.session_mutex = QMutex() # <--- INITIALIZE MUTEX HERE!
+    ```
+    We initialize a `QMutex` named `self.session_mutex` within the `ChatSessionManager` constructor. This mutex will be used to protect access to session data.
+*   *`FileProcessingThread.__init__`*:
+    ```python
+    def __init__(self, processor, file_path, session_mutex): # <--- ADD session_mutex PARAMETER
+        super().__init__()
+        self.processor = processor
+        self.file_path = file_path
+        self.file_content_text = None
+        self.session_mutex = session_mutex # <--- STORE MUTEX
+        # ...
+    ```
+    We've modified the `FileProcessingThread` constructor to accept a `session_mutex` as a parameter and store it as `self.session_mutex`.
+*   *`ModernChatWindow._process_file_content`*:
+    ```python
+    self.file_processor_thread = FileProcessingThread( # <--- PASS MUTEX HERE
+        self,
+        file_path,
+        self.session_manager.session_mutex # <--- PASS session_mutex from ChatSessionManager
+    )
+    ```
+    When creating the `FileProcessingThread` in `ModernChatWindow`, we now pass `self.session_manager.session_mutex` as an argument to the `FileProcessingThread` constructor.
+*   *`FileProcessingThread.update_session_safe`*:
+    ```python
+    def update_session_safe(self, data): # <--- MUTEX USED HERE!
+        self.session_mutex.lock() # <--- ACQUIRE LOCK
+        try:
+            if self.current_session:
+                self.current_session.update(data)
+        finally:
+            self.session_updated.emit()
+            self.session_mutex.unlock() # <--- RELEASE LOCK
+    ```
+    The `update_session_safe` method now uses `self.session_mutex.lock()` to acquire the lock before accessing/modifying session data and `self.session_mutex.unlock()` to release the lock in a `finally` block to ensure it's always released, even if exceptions occur within the `try` block.
+
+*Important Note:*
+
+As noted in the code comments within `FileProcessingThread.update_session_safe()`, *currently, there isn't explicit session data modification happening within the `FileProcessingThread.run()` method itself* in the original code.  The primary purpose of `FileProcessingThread` is to *process* files and emit the *results* back to the main thread. Session updates (like adding messages, attaching files to sessions) are handled *in the main thread* based on signals received from `FileProcessingThread`.
+
+Therefore, *for the current code structure*,  simply adding the mutex and the `update_session_safe()` function *might be an over-precaution*, as there's no immediately obvious race condition within `FileProcessingThread` in how it interacts with session data.
+
+*However*, it is still *good defensive programming practice* to include the mutex if there's *any potential* in future code modifications where `FileProcessingThread` *might* directly interact with and modify session data.  It's better to have the thread safety mechanism in place *just in case*.
+
+*Testing and Simulation (Validation):*
+
+1.  **Code Review:** Carefully review the code changes to ensure the mutex is initialized, passed correctly, and that `lock()` and `unlock()` are used in matched pairs and in appropriate locations (within `update_session_safe`). *This looks correct in the provided replacement code.*
+2.  **Mental Simulation:** Trace the execution flow, especially during file attachment and processing. Verify that if, in future modifications, you *were* to add code in `FileProcessingThread` that directly modifies `self.session_manager.sessions`, the `update_session_safe()` method (or similar mutex-protected access) would be used.
+3.  **Basic Functional Testing:** Run the application, attach different file types, send messages, load/save sessions.  Ensure all core functionalities still work as expected after the mutex changes.  *For this specific change (mutex addition without current mutex contention in the original code), functional behavior should ideally be unchanged.*
+4.  **Consider Stress Testing (Optional, for more rigorous validation):**  If you want to be absolutely sure, you could design a stress test that *intentionally* tries to create concurrent access scenarios (although with `ThreadPoolExecutor(max_workers=1)`, true concurrency is limited).  This might involve artificially slowing down file processing and trying to trigger UI actions that might access session data simultaneously.
+
+*Next Steps:*
+
+*   Replace the corresponding code blocks in your original code with the provided replacement blocks.
+*   Perform the testing and validation steps outlined above.
+*   If you anticipate *future modifications* where `FileProcessingThread` *might* directly modify session data, then using `update_session_safe()` (or a similar mutex-protected mechanism) to wrap those modifications will be crucial for thread safety.
+
+Let me know if you have any questions or want to explore more rigorous testing strategies! 👍
