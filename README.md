@@ -13,6 +13,8 @@ https://www.perplexity.ai/search/how-can-i-make-non-text-docume-3NyaJtsaRSyQgZXi
 
 app: https://github.com/nordeim/Multi-AI-Chat/blob/main/convert_document_for_LLM.py
 
+pip install python-pptx aspose-words ebooklib beautifulsoup4 pandas pillow pytesseract
+
 ![image](https://github.com/user-attachments/assets/ed5a514b-7925-4add-bbde-c9a5fe53ebed)
 
 ![image](https://github.com/user-attachments/assets/a56a128d-1c7d-4637-80ed-ea9aac45421c)
