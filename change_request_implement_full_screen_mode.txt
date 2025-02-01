@@ -1,0 +1,287 @@
+Okay, let's implement the full-screen chat toggle using the direct widget visibility control method. This should be a quick and effective way to add this feature! 👍
+
+*Here's the replacement code block to add the full-screen chat toggle feature:*
+
+```python
+from PyQt6.QtWidgets import (
+    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
+    QListWidget, QPushButton, QTextEdit, QTextBrowser, QFileDialog, QDialog,
+    QGridLayout, QMessageBox, QLineEdit, QComboBox, QSlider, QMenuBar,
+    QScrollArea, QDialogButtonBox, QSizePolicy, QMenu, QListWidgetItem, QDialog,
+    QStatusBar, QProgressBar # Added for status bar and progress bar
+)
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QDir, QSize, QSettings, QTimer, QObject, QMutex # ADD QMutex
+from PyQt6.QtGui import (
+    QFont, QKeySequence, QTextCursor, QColor, QAction, QIcon,
+    QTextCharFormat, QPalette, QGuiApplication, QPixmap # Added QPixmap
+)
+# ... other imports ...
+
+
+class ModernChatWindow(QMainWindow):
+    """Main application window with modern UI"""
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("AI Chat Studio")
+        self.setGeometry(100, 100, 1200, 800)
+
+        # ... existing __init__ code ...
+
+        self.is_fullscreen_chat_mode = False # <--- ADD FULLSCREEN STATE FLAG
+        self.original_left_panel_visible = True # <--- STORE ORIGINAL VISIBILITY STATES
+        self.original_preview_visible = True
+        self.original_input_panel_visible = True
+
+    def _setup_menubar(self):
+        """Proper menu bar implementation"""
+        menubar = QMenuBar(self)
+
+        # File menu
+        file_menu = menubar.addMenu("&File")
+        new_action = QAction("&New Chat", self)
+        new_action.triggered.connect(self._create_new_chat)
+        file_menu.addAction(new_action)
+
+        export_action = QAction("&Export Chat...", self)
+        export_action.triggered.connect(self._export_chat)
+        file_menu.addAction(export_action)
+
+        # View menu <--- ADD VIEW MENU
+        view_menu = menubar.addMenu("&View") # <--- CREATE VIEW MENU
+        fullscreen_chat_action = QAction("Toggle Full Screen Chat", self, checkable=True) # <--- CHECKABLE ACTION
+        fullscreen_chat_action.triggered.connect(self._toggle_fullscreen_chat) # <--- CONNECT TOGGLE FUNCTION
+        view_menu.addAction(fullscreen_chat_action) # <--- ADD TO VIEW MENU
+
+
+        # Settings menu
+        settings_menu = menubar.addMenu("&Settings")
+        config_action = QAction("&API Configuration...", self)
+        config_action.triggered.connect(self._show_api_config)
+        settings_menu.addAction(config_action)
+
+        self.setMenuBar(menubar)
+
+    def _setup_ui(self):
+        print(f"🛠️🛠️ Entering ModernChatWindow._setup_ui: self object ID = {id(self)}") # Debug print at the very start
+        self.status_bar = QStatusBar()
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setMaximum(100)
+        self.progress_bar.setValue(0)
+        self.status_bar.addPermanentWidget(self.progress_bar)
+        self.setStatusBar(self.status_bar)
+
+        main_widget = QWidget()
+        self.setCentralWidget(main_widget)
+        main_layout = QHBoxLayout(main_widget)
+        main_layout.setContentsMargins(16, 16, 16, 16)
+        main_layout.setSpacing(16)
+
+        # Left panel (Chat list)
+        self.left_panel = QWidget() # <--- MAKE left_panel an INSTANCE VARIABLE
+        self.left_panel.setFixedWidth(280)
+        left_layout = QVBoxLayout(self.left_panel) # <--- PASS self.left_panel
+        left_layout.setContentsMargins(0, 0, 0, 0)
+
+        self.chat_list = QListWidget()
+        self.chat_list.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        left_layout.addWidget(self.chat_list)
+
+        # Chat management buttons
+        self.new_btn = QPushButton("New Chat")
+        self.delete_btn = QPushButton("Delete Chat")
+        button_layout = QVBoxLayout()
+        button_layout.addWidget(self.new_btn)
+        button_layout.addWidget(self.delete_btn)
+        left_layout.addLayout(button_layout)
+        main_layout.addWidget(self.left_panel) # <--- ADD self.left_panel
+
+        # Right panel (Chat display and Preview)
+        right_panel = QWidget()
+        right_layout = QVBoxLayout(right_panel)
+        right_layout.setContentsMargins(0, 0, 0, 0)
+
+        # Chat display area
+        self.chat_display = QTextBrowser()
+        self.chat_display.setSizePolicy(
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Expanding
+        )
+        right_layout.addWidget(self.chat_display, 2)
+
+        # Preview area for images and files
+        print("🛠️🛠️ _setup_ui: About to create preview_label") # Debug before preview_label creation
+        self.preview_label = QLabel() # Preview area for images and files
+        print("✅✅ _setup_ui: preview_label created, object ID = {}".format(id(self.preview_label))) # Debug after preview_label creation
+        self.preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.preview_label.setFixedSize(300, 200)
+        self.preview_label.setStyleSheet("border: 1px solid #E0E0E0; border-radius: 5px; background-color: #FAFAFA;")
+        self.preview_label.clear()
+
+        scroll_preview = QScrollArea()
+        scroll_preview.setWidgetResizable(True)
+        scroll_preview.setWidget(self.preview_label)
+        scroll_preview.setMaximumHeight(200)
+        self.preview_area = scroll_preview # <--- MAKE preview_area an INSTANCE VARIABLE
+        right_layout.addWidget(self.preview_area, 1) # <--- ADD self.preview_area
+
+        # Input area
+        self.input_panel = QWidget() # <--- MAKE input_panel an INSTANCE VARIABLE
+        input_layout = QVBoxLayout(self.input_panel) # <--- PASS self.input_panel
+        self.input_field = QTextEdit()
+        self.input_field.setPlaceholderText("Type your message...")
+        self.input_field.setMaximumHeight(100)
+        input_layout.addWidget(self.input_field)
+
+        # Toolbar with emoji button
+        toolbar = QHBoxLayout()
+        self.attach_btn = QPushButton("Attach File")
+        self.emoji_btn = QPushButton("😊 Emoji")
+        self.send_btn = QPushButton("Send")
+        toolbar.addWidget(self.attach_btn)
+        toolbar.addWidget(self.emoji_btn)
+        toolbar.addWidget(self.send_btn)
+        input_layout.addLayout(toolbar)
+        right_layout.addWidget(self.input_panel) # <--- ADD self.input_panel
+
+        main_layout.addWidget(right_panel, 3)
+
+        self.attachment_label = self.preview_label # 🌟 attachment_label is ALIAS to preview_label! 🌟
+        print("✅✅ _setup_ui: attachment_label ASSIGNED to preview_label, object ID (attachment_label) = {}, object ID (preview_label) = {}".format(id(self.attachment_label), id(self.preview_label))) # Debug print after assignment
+
+        print(f"✅✅ Exiting ModernChatWindow._setup_ui: self object ID = {id(self)}") # Debug print at the very end
+
+
+    def _toggle_fullscreen_chat(self): # <--- IMPLEMENT TOGGLE FUNCTION
+        self.is_fullscreen_chat_mode = not self.is_fullscreen_chat_mode # <--- TOGGLE STATE
+        action = None
+        for a in self.menuBar().actions():
+            for m in a.menu().actions():
+                if m.text() == "Toggle Full Screen Chat": # Find the action
+                    action = m
+                    break
+        if action:
+            action.setChecked(self.is_fullscreen_chat_mode) # Update checkmark state
+
+        if self.is_fullscreen_chat_mode:
+            # Store current visibility states
+            self.original_left_panel_visible = self.left_panel.isVisible()
+            self.original_preview_visible = self.preview_area.isVisible()
+            self.original_input_panel_visible = self.input_panel.isVisible()
+
+            # Hide left panel, preview area, and input panel
+            self.left_panel.setVisible(False)
+            self.preview_area.setVisible(False)
+            self.input_panel.setVisible(False)
+        else:
+            # Restore original visibility states
+            self.left_panel.setVisible(self.original_left_panel_visible)
+            self.preview_area.setVisible(self.original_preview_visible)
+            self.input_panel.setVisible(self.original_input_panel_visible)
+
+
+    # ... rest of ModernChatWindow class ...
+```
+
+*Explanation of Changes:*
+
+1.  **`self.is_fullscreen_chat_mode` Flag:**
+    ```python
+    self.is_fullscreen_chat_mode = False
+    ```
+    A boolean flag `self.is_fullscreen_chat_mode` is added to the `ModernChatWindow` class to track whether the chat is in full-screen mode or not. It's initialized to `False` (normal mode).
+
+2.  **Storing Original Visibility States:**
+    ```python
+    self.original_left_panel_visible = True
+    self.original_preview_visible = True
+    self.original_input_panel_visible = True
+    ```
+    Boolean variables are added to store the original visibility states of the left panel, preview area, and input panel *before* entering full-screen mode. This allows us to restore these states when toggling back to normal mode.
+
+3.  **Making UI Elements Instance Variables:**
+    In `_setup_ui()`, we've changed these lines to make `self.left_panel`, `self.preview_area`, and `self.input_panel` instance variables of the `ModernChatWindow` class:
+    ```python
+    self.left_panel = QWidget() # <--- MAKE left_panel an INSTANCE VARIABLE
+    # ...
+    self.preview_area = scroll_preview # <--- MAKE preview_area an INSTANCE VARIABLE
+    # ...
+    self.input_panel = QWidget() # <--- MAKE input_panel an INSTANCE VARIABLE
+    ```
+    This is necessary so that the `_toggle_fullscreen_chat()` method can access and control the visibility of these UI elements.
+
+4.  **Adding "View" Menu and "Toggle Full Screen Chat" Action:**
+    In `_setup_menubar()`, we've added a "View" menu and a "Toggle Full Screen Chat" action:
+    ```python
+    # View menu <--- ADD VIEW MENU
+    view_menu = menubar.addMenu("&View") # <--- CREATE VIEW MENU
+    fullscreen_chat_action = QAction("Toggle Full Screen Chat", self, checkable=True) # <--- CHECKABLE ACTION
+    fullscreen_chat_action.triggered.connect(self._toggle_fullscreen_chat) # <--- CONNECT TOGGLE FUNCTION
+    view_menu.addAction(fullscreen_chat_action) # <--- ADD TO VIEW MENU
+    ```
+    *   A "View" menu is created in the menu bar.
+    *   A `QAction` named "Toggle Full Screen Chat" is created.
+        *   `checkable=True` makes it a checkable menu item, so it will show a checkmark when full-screen is active.
+        *   `triggered.connect(self._toggle_fullscreen_chat)` connects its `triggered` signal to the new `_toggle_fullscreen_chat()` method.
+    *   The action is added to the "View" menu.
+
+5.  **Implementing `_toggle_fullscreen_chat()`:**
+    ```python
+    def _toggle_fullscreen_chat(self): # <--- IMPLEMENT TOGGLE FUNCTION
+        self.is_fullscreen_chat_mode = not self.is_fullscreen_chat_mode # <--- TOGGLE STATE
+        action = None
+        for a in self.menuBar().actions():
+            for m in a.menu().actions():
+                if m.text() == "Toggle Full Screen Chat": # Find the action
+                    action = m
+                    break
+        if action:
+            action.setChecked(self.is_fullscreen_chat_mode) # Update checkmark state
+
+        if self.is_fullscreen_chat_mode:
+            # Store current visibility states
+            self.original_left_panel_visible = self.left_panel.isVisible()
+            self.original_preview_visible = self.preview_area.isVisible()
+            self.original_input_panel_visible = self.input_panel.isVisible()
+
+            # Hide left panel, preview area, and input panel
+            self.left_panel.setVisible(False)
+            self.preview_area.setVisible(False)
+            self.input_panel.setVisible(False)
+        else:
+            # Restore original visibility states
+            self.left_panel.setVisible(self.original_left_panel_visible)
+            self.preview_area.setVisible(self.original_preview_visible)
+            self.input_panel.setVisible(self.original_input_panel_visible)
+    ```
+    This method handles the toggling logic:
+    *   `self.is_fullscreen_chat_mode = not self.is_fullscreen_chat_mode`:  Toggles the full-screen state flag.
+    *   It finds the "Toggle Full Screen Chat" action in the menu and updates its checkmark state to reflect the current `self.is_fullscreen_chat_mode`.
+    *   *If entering full-screen mode (`self.is_fullscreen_chat_mode` is now `True`):*
+        *   It stores the current visibility of `self.left_panel`, `self.preview_area`, and `self.input_panel` in the `original_..._visible` variables.
+        *   It then sets the visibility of these panels to `False` using `setVisible(False)`, effectively hiding them.
+    *   *If exiting full-screen mode (`self.is_fullscreen_chat_mode` is now `False`):*
+        *   It restores the visibility of `self.left_panel`, `self.preview_area`, and `self.input_panel` to their *original* states (that were saved before entering full-screen) using `setVisible(self.original_..._visible)`.
+
+*How to Use and Test:*
+
+1.  **Replace Code:** Replace the corresponding sections in your `ModernChatWindow` class (especially `_setup_menubar`, `_setup_ui`, and add the `_toggle_fullscreen_chat` method and the new instance variables) with the code block above.
+2.  **Run the Application:** Launch your application.
+3.  **Menu Bar:** You should now see a "View" menu in the menu bar, with a "Toggle Full Screen Chat" option.
+4.  **Toggle:** Click "Toggle Full Screen Chat" in the "View" menu.
+    *   The left chat list panel, the file preview area, and the input box should disappear.
+    *   The chat display area should expand to fill the entire window.
+    *   The "Toggle Full Screen Chat" menu item should now have a checkmark (indicating it's active).
+5.  **Toggle Back:** Click "Toggle Full Screen Chat" again.
+    *   The left panel, preview area, and input box should reappear.
+    *   The layout should return to the normal state.
+    *   The checkmark in the menu item should disappear.
+
+*Expected Behavior and Further Improvements:*
+
+*   This implementation should provide a basic, functional full-screen chat toggle.
+*   **Layout Adjustment:** In this quick implementation, we're simply hiding/showing panels. For a more visually polished full-screen mode, you might want to:
+    *   *Adjust Layout Weights/Stretch Factors:*  Modify the layout weights of the main horizontal layout (`main_layout`) to give the right panel (containing `chat_display`) a weight of `1` in full-screen mode and restore the original weights in normal mode. This would make the `chat_display` *actually* expand to take up the available space more dynamically.
+    *   *Consider Removing Margins/Spacing in Full-Screen:*  You could also reduce or remove margins and spacing in the main layout (`main_layout.setContentsMargins(0, 0, 0, 0)` and `main_layout.setSpacing(0)`) in full-screen mode to maximize the chat display area. Remember to restore the original margins and spacing when toggling back.
+*   **Menu Checkmark:** The checkable menu item visually indicates the full-screen chat mode is active, which is good user feedback.
+
+This quick fix should give you a functional full-screen chat toggle. For a more refined visual experience, consider the layout adjustments mentioned above! Let me know how it goes or if you want to refine it further with layout adjustments! 👍
