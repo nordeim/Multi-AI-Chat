@@ -12,10 +12,6 @@ separate app to convert any document type to text represenation for use as LLM p
 $ pip install Pillow pytesseract aspose-words python-pptx ebooklib beautifulsoup4 pandas pymupdf
 
 $ python convert_doc_for_llm.py
-Enter the path to your input document:  my_presentation.pptx
-Enter the path to save the output text file: output.txt
-Detected file type: application/vnd.openxmlformats-officedocument.presentationml.presentation
-🎉 Conversion complete! Text saved to: output.txt
 
 for pytesseract, you need to have Tesseract OCR engine installed on your system separately. See https://tesseract-ocr.github.io/tessdoc/Installation.html for installation instructions for your operating system.
 
