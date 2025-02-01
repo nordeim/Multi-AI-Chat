@@ -9,11 +9,14 @@ $ python mychat-pyqt6-v24.py # latest - fixed various file type handling issues 
 
 separate app to convert any document type to text represenation for use as LLM prompt:
 
-https://www.perplexity.ai/search/how-can-i-make-non-text-docume-3NyaJtsaRSyQgZXiH5YEQw
+$ pip install Pillow pytesseract aspose-words python-pptx ebooklib beautifulsoup4 pandas pymupdf
+$ python convert_doc_for_llm.py
+Enter the path to your input document:  my_presentation.pptx
+Enter the path to save the output text file: output.txt
+Detected file type: application/vnd.openxmlformats-officedocument.presentationml.presentation
+🎉 Conversion complete! Text saved to: output.txt
 
-app: https://github.com/nordeim/Multi-AI-Chat/blob/main/convert_document_for_LLM.py
-
-pip install python-pptx aspose-words ebooklib beautifulsoup4 pandas pillow pytesseract
+for pytesseract, you need to have Tesseract OCR engine installed on your system separately. See https://tesseract-ocr.github.io/tessdoc/Installation.html for installation instructions for your operating system.
 
 ![image](https://github.com/user-attachments/assets/ed5a514b-7925-4add-bbde-c9a5fe53ebed)
 
