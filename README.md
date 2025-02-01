@@ -10,6 +10,7 @@ $ python mychat-pyqt6-v24.py # latest - fixed various file type handling issues 
 separate app to convert any document type to text represenation for use as LLM prompt:
 
 $ pip install Pillow pytesseract aspose-words python-pptx ebooklib beautifulsoup4 pandas pymupdf
+
 $ python convert_doc_for_llm.py
 Enter the path to your input document:  my_presentation.pptx
 Enter the path to save the output text file: output.txt
