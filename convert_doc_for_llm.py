@@ -21,8 +21,10 @@ def detect_file_type(file_path):
         if ext_lower in ['.txt', '.log', '.csv']:
             mime_type = 'text/plain'
         elif ext_lower in ['.epub']:
+            print("DEBUG: EPUB extension detected!") # Added debug print here
             mime_type = 'application/epub+zip'
         elif ext_lower in ['.pdf']:
+            print("DEBUG: PDF extension detected!") # Added debug print here
             mime_type = 'application/pdf'
         elif ext_lower in ['.docx', '.doc']:
             mime_type = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
